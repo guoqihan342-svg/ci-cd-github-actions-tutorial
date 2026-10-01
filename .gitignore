@@ -1,0 +1,24 @@
+# 工作区私有数据（不发布）
+.workbuddy-ai/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 编辑器与系统
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 临时文件
+_*.md
+_*.html
+_*.png
+*.log

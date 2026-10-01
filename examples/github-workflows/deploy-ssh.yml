@@ -1,0 +1,46 @@
+name: Deploy via SSH
+
+# 仅在 main 分支推送时部署到生产
+on:
+  push:
+    branches: [ main ]
+
+# 防止并发部署
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # 使用 Environment 获得审批保护
+    environment:
+      name: production
+      url: https://example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: 远程部署
+        run: |
+          ssh -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" '
+            set -e
+            cd /var/www/app
+            git fetch --all
+            git reset --hard origin/main
+            npm ci --omit=dev
+            npm run build --if-present
+            pm2 reload app || pm2 start npm --name app -- start
+          '
+
+# 需要在仓库 Settings → Secrets 中配置：
+#   SSH_HOST  服务器地址
+#   SSH_USER  登录用户
+#   SSH_KEY   私钥内容
+#   SSH_PORT  SSH 端口（默认 22）

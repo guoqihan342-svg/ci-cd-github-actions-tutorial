@@ -1,0 +1,52 @@
+name: Daily Report
+
+on:
+  schedule:
+    # 分 时 日 月 周（UTC）。0 1 * * * = 每天 UTC 01:00，即北京时间 09:00
+    - cron: '0 1 * * *'
+  workflow_dispatch:        # 保留手动触发，便于失败后重跑
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 运行管道
+        run: python -m pipeline.run
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          DB_URL: ${{ secrets.DB_URL }}
+
+      - name: 上传报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-report-${{ github.run_number }}
+          path: output/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: 推送企业微信通知
+        if: always()
+        run: |
+          curl -s -X POST "${{ secrets.WECOM_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"msgtype\":\"markdown\",\"markdown\":{\"content\":\"**每日报告 ${{ job.status }}**\\n仓库: ${{ github.repository }}\\n运行号: ${{ github.run_number }}\\n报告见 Actions 产物\"}}"
+
+# 需要在仓库 Settings → Secrets 中配置：
+#   API_KEY         数据源密钥
+#   DB_URL          数据库连接串
+#   WECOM_WEBHOOK   企业微信群机器人 Webhook

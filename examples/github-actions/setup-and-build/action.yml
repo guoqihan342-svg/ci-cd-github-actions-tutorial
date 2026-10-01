@@ -1,0 +1,48 @@
+# 复合 Action 示例
+# 放置路径：.github/actions/setup-and-build/action.yml
+# 作用：把"安装 Node + 装依赖 + 构建"封装成一个可复用动作
+#
+# 使用方式：
+#   - uses: actions/checkout@v4
+#   - uses: ./.github/actions/setup-and-build
+#     with:
+#       node-version: '20'
+name: 'Setup and Build'
+description: '安装 Node、安装依赖并执行构建'
+
+inputs:
+  node-version:
+    description: 'Node.js 版本'
+    required: false
+    default: '20'
+  build-command:
+    description: '构建命令'
+    required: false
+    default: 'npm run build'
+
+outputs:
+  dist-hash:
+    description: '构建产物目录的哈希'
+    value: ${{ steps.hash.outputs.dist-hash }}
+
+runs:
+  using: composite
+  steps:
+    - name: 安装 Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: 安装依赖
+      shell: bash
+      run: npm ci
+
+    - name: 构建
+      shell: bash
+      run: ${{ inputs.build-command }}
+
+    - name: 计算产物哈希
+      id: hash
+      shell: bash
+      run: echo "dist-hash=$(find dist -type f -exec sha1sum {} + | sort | sha1sum | cut -d' ' -f1)" >> $GITHUB_OUTPUT

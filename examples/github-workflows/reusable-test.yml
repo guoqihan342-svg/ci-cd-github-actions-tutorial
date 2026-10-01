@@ -1,0 +1,59 @@
+# 可复用工作流：供其他工作流通过 `uses:` 调用
+# 用法：
+#   jobs:
+#     test:
+#       uses: ./.github/workflows/reusable-test.yml
+#       with:
+#         node-version: '20'
+#       secrets: inherit
+name: Reusable Test
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js 版本'
+        required: false
+        type: string
+        default: '20'
+    secrets:
+      NPM_TOKEN:
+        description: '私有 npm registry 令牌（可选）'
+        required: false
+    outputs:
+      artifact-name:
+        description: '构建产物名称'
+        value: ${{ jobs.test.outputs.artifact }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact: ${{ steps.pack.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: 安装依赖
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 测试
+        run: npm test
+
+      - name: 打包并设置输出
+        id: pack
+        run: |
+          npm run build
+          echo "name=dist-node-${{ inputs.node-version }}" >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pack.outputs.name }}
+          path: dist/
